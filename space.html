@@ -1,0 +1,365 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Defender</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.7/babel.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Arial', sans-serif;
+      background: #0a0a1a;
+      color: #ffffff;
+      overflow: hidden;
+    }
+    #root {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .game-container {
+      width: 600px;
+      height: 400px;
+      position: relative;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400"><rect width="100%" height="100%" fill="%230a0a1a"/><circle cx="50" cy="50" r="2" fill="%23ffffff"/><circle cx="150" cy="100" r="1" fill="%23aaaaaa"/><circle cx="300" cy="200" r="2" fill="%23ffffff"/><circle cx="450" cy="300" r="1" fill="%23aaaaaa"/><circle cx="100" cy="350" r="2" fill="%23ffffff"/></svg>');
+      border: 2px solid #00ffff;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+      overflow: hidden;
+    }
+    .score-board {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #00ffff;
+      text-shadow: 0 0 5px #00ffff;
+    }
+    .spaceship {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2300ffff" stroke-width="2"><path d="M12 2L4 20h16L12 2z"/><circle cx="12" cy="18" r="2" fill="%23ff00ff"/></svg>') no-repeat center;
+      background-size: contain;
+      box-shadow: 0 0 10px #00ffff;
+    }
+    .asteroid {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: radial-gradient(circle, #ff00ff 20%, #00ffff 80%);
+      border-radius: 50%;
+      box-shadow: 0 0 15px #ff00ff;
+    }
+    .laser {
+      position: absolute;
+      width: 5px;
+      height: 15px;
+      background: #ff0000;
+      box-shadow: 0 0 10px #ff0000;
+      border-radius: 2px;
+    }
+    .power-up {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: #ffff00;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #ffff00;
+    }
+    .game-over {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2rem;
+      color: #ff0000;
+      text-shadow: 0 0 10px #ff0000;
+      text-align: center;
+    }
+    .retry-button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      background: #00ffff;
+      color: #000000;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0 0 10px #00ffff;
+    }
+    .retry-button:hover {
+      background: #00cccc;
+      box-shadow: 0 0 15px #00cccc;
+    }
+    @keyframes particle-explosion {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+    .particle {
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: #ff00ff;
+      border-radius: 50%;
+      animation: particle-explosion 0.5s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const CosmicDefender = () => {
+      const [player, setPlayer] = useState({ x: 280, y: 350 });
+      const [asteroids, setAsteroids] = useState([]);
+      const [lasers, setLasers] = useState([]);
+      const [powerUps, setPowerUps] = useState([]);
+      const [score, setScore] = useState(0);
+      const [gameOver, setGameOver] = useState(false);
+      const [powerUpActive, setPowerUpActive] = useState(false);
+      const gameRef = useRef(null);
+      const keys = useRef({});
+
+      const spawnAsteroid = () => ({
+        id: Math.random(),
+        x: Math.random() * 560,
+        y: 0,
+        speed: 2 + score / 1000,
+      });
+
+      const spawnPowerUp = () => ({
+        id: Math.random(),
+        x: Math.random() * 560,
+        y: 0,
+      });
+
+      useEffect(() => {
+        if (!gameOver) {
+          const interval = setInterval(() => {
+            setAsteroids(prev => [
+              ...prev.filter(a => a.y < 400),
+              ...(Math.random() < 0.1 ? [spawnAsteroid()] : []),
+            ]);
+            setPowerUps(prev => [
+              ...prev.filter(p => p.y < 400),
+              ...(Math.random() < 0.02 ? [spawnPowerUp()] : []),
+            ]);
+          }, 1000);
+          return () => clearInterval(interval);
+        }
+      }, [gameOver, score]);
+
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          keys.current[e.key] = true;
+          if (e.key === ' ' && !gameOver) {
+            setLasers(prev => [
+              ...prev,
+              { id: Math.random(), x: player.x + 18, y: player.y, speed: powerUpActive ? 15 : 10 },
+            ]);
+          }
+        };
+        const handleKeyUp = (e) => {
+          keys.current[e.key] = false;
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+          window.removeEventListener('keyup', handleKeyUp);
+        };
+      }, [player, gameOver, powerUpActive]);
+
+      useEffect(() => {
+        if (!gameOver) {
+          const move = () => {
+            setPlayer(prev => {
+              let newX = prev.x;
+              let newY = prev.y;
+              if (keys.current['ArrowLeft'] || keys.current['a']) newX -= 5;
+              if (keys.current['ArrowRight'] || keys.current['d']) newX += 5;
+              if (keys.current['ArrowUp'] || keys.current['w']) newY -= 5;
+              if (keys.current['ArrowDown'] || keys.current['s']) newY += 5;
+              newX = Math.max(0, Math.min(newX, 560));
+              newY = Math.max(0, Math.min(newY, 360));
+              return { x: newX, y: newY };
+            });
+            setLasers(prev => prev.filter(l => l.y > 0).map(l => ({ ...l, y: l.y - l.speed })));
+            setAsteroids(prev => prev.map(a => ({ ...a, y: a.y + a.speed })));
+            setPowerUps(prev => prev.map(p => ({ ...p, y: p.y + 3 })));
+          };
+          const interval = setInterval(move, 16);
+          return () => clearInterval(interval);
+        }
+      }, [gameOver]);
+
+      useEffect(() => {
+        const checkCollisions = () => {
+          setLasers(prevLasers => {
+            let newScore = score;
+            let newAsteroids = [...asteroids];
+            const newLasers = prevLasers.filter(laser => {
+              let hit = false;
+              newAsteroids = newAsteroids.filter(asteroid => {
+                const dx = laser.x - asteroid.x;
+                const dy = laser.y - asteroid.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 20) {
+                  newScore += 10;
+                  setParticles(p => [...p, ...Array(5).fill().map(() => ({
+                    id: Math.random(),
+                    x: asteroid.x,
+                    y: asteroid.y,
+                    dx: (Math.random() - 0.5) * 10,
+                    dy: (Math.random() - 0.5) * 10,
+                  }))]);
+                  setTimeout(() => setParticles(p => p.filter(p => p.age < 500)), 500);
+                  return false;
+                }
+                return true;
+              });
+              return !hit;
+            });
+            setAsteroids(newAsteroids);
+            setScore(newScore);
+            return newLasers;
+          });
+
+          setPowerUps(prev => prev.filter(powerUp => {
+            const dx = player.x - powerUp.x;
+            const dy = player.y - powerUp.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 20) {
+              setPowerUpActive(true);
+              setTimeout(() => setPowerUpActive(false), 5000);
+              return false;
+            }
+            return true;
+          }));
+
+          asteroids.forEach(asteroid => {
+            const dx = player.x - asteroid.x;
+            const dy = player.y - asteroid.y;
+            if (Math.sqrt(dx * dx + dy * dy) < 30) {
+              setGameOver(true);
+            }
+          });
+        };
+        if (!gameOver) {
+          const interval = setInterval(checkCollisions, 16);
+          return () => clearInterval(interval);
+        }
+      }, [asteroids, player, score, gameOver]);
+
+      const [particles, setParticles] = useState([]);
+
+      const resetGame = () => {
+        setPlayer({ x: 280, y: 350 });
+        setAsteroids([]);
+        setLasers([]);
+        setPowerUps([]);
+        setScore(0);
+        setGameOver(false);
+        setPowerUpActive(false);
+        setParticles([]);
+      };
+
+      return (
+        <div className="game-container">
+          <div className="score-board">Score: {score}</div>
+          <div
+            className="spaceship"
+            style={{ transform: `translate(${player.x}px, ${player.y}px)` }}
+          ></div>
+          {asteroids.map(asteroid => (
+            <div
+              key={asteroid.id}
+              className="asteroid"
+              style={{ transform: `translate(${asteroid.x}px, ${asteroid.y}px)` }}
+            ></div>
+          ))}
+          {lasers.map(laser => (
+            <div
+              key={laser.id}
+              className="laser"
+              style={{ transform: `translate(${laser.x}px, ${laser.y}px)` }}
+            ></div>
+          ))}
+          {powerUps.map(powerUp => (
+            <div
+              key={powerUp.id}
+              className="power-up"
+              style={{ transform: `translate(${powerUp.x}px, ${powerUp.y}px)` }}
+            ></div>
+          ))}
+          {particles.map(particle => (
+            <div
+              key={particle.id}
+              className="particle"
+              style={{
+                transform: `translate(${particle.x + particle.dx}px, ${particle.y + particle.dy}px)`,
+              }}
+            ></div>
+          ))}
+          {gameOver && (
+            <div className="game-over">
+              Game Over! Score: {score}
+              <br />
+              <button className="retry-button" onClick={resetGame}>
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<CosmicDefender />);
+  </script>
+</body>
+</html>
