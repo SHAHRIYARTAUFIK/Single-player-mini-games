@@ -25,3 +25,11 @@ Bullets fire automatically - no need to press anything
 Avoid red enemy ships (triangular pointing down)
 Destroy enemies to earn points
 Don't let enemies hit you - you have 3 lives
+5) **Cosmic Defender**
+Objective: Control a spaceship to shoot lasers at moving asteroids, avoid collisions, and collect power-ups to boost your score. Survive as long as possible as asteroids get faster and denser.
+How to Play
+Move: Use arrow keys or WASD to move the spaceship (cyan triangle with magenta core).
+Shoot: Press the spacebar to fire red laser beams (faster with power-ups).
+Objective: Destroy neon asteroids (cyan/magenta) to earn 10 points each. Collect yellow power-ups for faster shots (5-second duration).
+Game Over: Collide with an asteroid to end the game. Click "Retry" to restart.
+Difficulty: Asteroids spawn more frequently and move faster as your score increases.
