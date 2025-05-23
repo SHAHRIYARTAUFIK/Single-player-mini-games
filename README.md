@@ -16,3 +16,12 @@ Responsive: Works on any device with a clean, centered layout.
 Reusable Components: The MemoryGame component encapsulates all logic and UI, making it easy to extend or modify.
 To run the game, save the code as index.html and open it in a browser. The game uses CDNs for React, ReactDOM, Babel, and Tailwind CSS, so no additional setup is required. Let me know if you’d like to add features like difficulty levels, a timer, or different themes!
 4) **Cosmic Defender**
+   
+** How to Play:**
+
+Click "START GAME" button to begin
+Use WASD keys or Arrow Keys to move your blue triangular ship
+Bullets fire automatically - no need to press anything
+Avoid red enemy ships (triangular pointing down)
+Destroy enemies to earn points
+Don't let enemies hit you - you have 3 lives
