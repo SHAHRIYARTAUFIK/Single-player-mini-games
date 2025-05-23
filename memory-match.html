@@ -1,0 +1,226 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory Match Game</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.7/babel.min.js"></script>
+  <style>
+    /* Minimal Tailwind CSS subset for the game with vendor prefixes */
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    .bg-gray-100 { background-color: #f3f4f6; }
+    .bg-gray-300 { background-color: #d1d5db; }
+    .text-gray-300 { color: #d1d5db; }
+    .bg-indigo-500 { background-color: #6366f1; }
+    .bg-indigo-600 { background-color: #4f46e5; }
+    .hover\:bg-indigo-700:hover { background-color: #4338ca; }
+    .text-white { color: #ffffff; }
+    .text-indigo-600 { color: #4f46e5; }
+    .text-green-600 { color: #16a34a; }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-center { justify-content: center; }
+    .min-h-screen { min-height: 100vh; }
+    .text-center { text-align: center; }
+    .p-4 { padding: 1rem; }
+    .max-w-lg { max-width: 32rem; }
+    .mx-auto { margin-left: auto; margin-right: auto; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mt-6 { margin-top: 1.5rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+    .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+    .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .grid { display: grid; }
+    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .gap-2 { gap: 0.5rem; }
+    .w-20 { width: 5rem; }
+    .h-20 { height: 5rem; }
+    .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+    .cursor-pointer { cursor: pointer; }
+    .transform { transform: translate(0, 0); }
+    .transition-transform {
+      transition: transform 0.3s ease-in-out;
+      -webkit-transition: transform 0.3s ease-in-out;
+      -moz-transition: transform 0.3s ease-in-out;
+    }
+    .duration-300 { transition-duration: 300ms; }
+    .rotate-y-0 {
+      transform: rotateY(0deg);
+      -webkit-transform: rotateY(0deg);
+      -moz-transform: rotateY(0deg);
+    }
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+      -webkit-transform: rotateY(180deg);
+      -moz-transform: rotateY(180deg);
+    }
+    .rounded-lg { border-radius: 0.5rem; }
+    .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1); }
+    .hover\:shadow-lg:hover { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1); }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .rounded { border-radius: 0.25rem; }
+  </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const cardIcons = ['😺', '🐶', '🐼', '🦁', '🐘', '🦒', '🐧', '🦊'];
+    const generateCards = () => {
+      const cards = [...cardIcons, ...cardIcons]
+        .sort(() => Math.random() - 0.5)
+        .map((icon, index) => ({
+          id: index,
+          icon,
+          isFlipped: false,
+          isMatched: false,
+        }));
+      return cards;
+    };
+
+    const MemoryGame = () => {
+      const [cards, setCards] = useState(generateCards());
+      const [flippedCards, setFlippedCards] = useState([]);
+      const [score, setScore] = useState(0);
+      const [moves, setMoves] = useState(0);
+      const [gameOver, setGameOver] = useState(false);
+
+      useEffect(() => {
+        if (flippedCards.length === 2) {
+          const [first, second] = flippedCards;
+          setMoves(moves + 1);
+          if (cards[first].icon === cards[second].icon) {
+            setCards(cards.map(card =>
+              card.id === first || card.id === second
+                ? { ...card, isMatched: true }
+                : card
+            ));
+            setScore(score + 1);
+            setFlippedCards([]);
+          } else {
+            setTimeout(() => {
+              setCards(cards.map(card =>
+                card.id === first || card.id === second
+                  ? { ...card, isFlipped: false }
+                  : card
+              ));
+              setFlippedCards([]);
+            }, 1000);
+          }
+        }
+      }, [flippedCards]);
+
+      useEffect(() => {
+        if (score === cardIcons.length) {
+          setGameOver(true);
+        }
+      }, [score]);
+
+      const handleCardClick = (index) => {
+        if (flippedCards.length < 2 && !cards[index].isFlipped && !cards[index].isMatched) {
+          setCards(cards.map((card, i) =>
+            i === index ? { ...card, isFlipped: true } : card
+          ));
+          setFlippedCards([...flippedCards, index]);
+        }
+      };
+
+      const resetGame = () => {
+        setCards(generateCards());
+        setFlippedCards([]);
+        setScore(0);
+        setMoves(0);
+        setGameOver(false);
+      };
+
+      return (
+        <div className="text-center p-4 max-w-lg mx-auto">
+          <h1 className="text-3xl font-bold mb-4 text-indigo-600">Memory Match Game</h1>
+          <div className="mb-4 text-lg">
+            <p>Moves: {moves}</p>
+            <p>Pairs Found: {score}/{cardIcons.length}</p>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {cards.map((card, index) => (
+              <div
+                key={card.id}
+                className={`w-20 h-20 flex items-center justify-center text-2xl cursor-pointer transform transition-transform duration-300 ${
+                  card.isFlipped || card.isMatched
+                    ? 'bg-indigo-500 text-white rotate-y-0'
+                    : 'bg-gray-300 text-gray-300 rotate-y-180'
+                } rounded-lg shadow-md hover:shadow-lg`}
+                onClick={() => handleCardClick(index)}
+              >
+                {card.isFlipped || card.isMatched ? card.icon : '?'}
+              </div>
+            ))}
+          </div>
+          {gameOver && (
+            <div className="mt-6">
+              <p className="text-xl font-semibold text-green-600">You Win!</p>
+              <button
+                onClick={resetGame}
+                className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Play Again
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<MemoryGame />);
+  </script>
+</body>
+</html>
