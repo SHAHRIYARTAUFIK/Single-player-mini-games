@@ -17,7 +17,7 @@ Reusable Components: The MemoryGame component encapsulates all logic and UI, mak
 To run the game, save the code as index.html and open it in a browser. The game uses CDNs for React, ReactDOM, Babel, and Tailwind CSS, so no additional setup is required. Let me know if you’d like to add features like difficulty levels, a timer, or different themes!
 4) **Cosmic Defender**
    
-** How to Play:**
+**How to Play:**
 
 Click "START GAME" button to begin
 Use WASD keys or Arrow Keys to move your blue triangular ship
